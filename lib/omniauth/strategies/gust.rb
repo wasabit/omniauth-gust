@@ -3,39 +3,52 @@ require 'omniauth-oauth2'
 module OmniAuth
   module Strategies
     class Gust < OmniAuth::Strategies::OAuth2
+      DEFAULT_SCOPE = 'read-write'
+
+      option :name, "gust"
+
       option :client_options, {
         :site => 'https://alpha.gust.com',
         :authorize_url => '/r/oauth/authorize',
         :token_url => '/r/oauth/token'
       }
 
-      def request_phase
-        super
-      end
-
-      uid { raw_ifno['id'] }
+      uid { 
+        raw_info['id'] 
+      }
 
       info do
+        prune!({
+          'name' => raw_info["user_name"],
+          'email' => raw_info["email"],
+          'company_name' => raw_info['company_name'],
+          'urls' => {
+            'profile' => raw_info['profile_url']
+          }
+        })
+      end
+
+      extra do
         {
-          "name" => raw_ifno["name"],
-          "bio" => raw_ifno["bio"],
-          "blog_url" => raw_ifno["blog_url"],
-          "online_bio_url" => raw_ifno["online_bio_url"],
-          "twitter_url" => raw_ifno["twitter_url"],
-          "facebook_url" => raw_ifno["facebook_url"],
-          "linkedin_url" => raw_ifno["linkedin_url"],
-          "follower_count" => raw_ifno["follower_count"],
-          "gust_url" => raw_ifno["gust_url"],
-          "image" => raw_ifno["image"],
-          "locations" => raw_ifno["locations"],
-          "roles" => raw_ifno["roles"]
+          'raw_info' => raw_info
         }
       end
 
-      def raw_ifno
-        access_token.options[:mode] = :query
-        @raw_ifno ||= access_token.get('https://api.angel.co/1/me').parsed
+      def raw_info
+        return @raw_info if @raw_info
+        (access_token.options || {}).merge!({:header_format => 'OAuth %s'})
+        @raw_info = access_token.get('/r/oauth/user_details').parsed
       end
+
+
+      private 
+        def prune!(hash)
+          hash.delete_if do |_, value| 
+            prune!(value) if value.is_a?(Hash)
+            value.nil? || (value.respond_to?(:empty?) && value.empty?)
+          end
+        end
+
     end
   end
 end

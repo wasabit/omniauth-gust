@@ -1,14 +1,20 @@
 require 'spec_helper'
 require 'omniauth-gust'
 
+# Based on tests from https://github.com/mkdynamic/omniauth-facebook
 describe OmniAuth::Strategies::Gust do
   before :each do
     @request = double('Request')
     @request.stub(:params) { {} }
+    @request.stub(:cookies) { {} }
+    
+    @client_id = '123'
+    @client_secret = 'aaa'
   end
   
   subject do
-    OmniAuth::Strategies::Gust.new(nil, @options || {}).tap do |strategy|
+    args = [@client_id, @client_secret, @options].compact
+    OmniAuth::Strategies::Gust.new(nil, *args).tap do |strategy|
       strategy.stub(:request) { @request }
     end
   end
@@ -29,84 +35,73 @@ describe OmniAuth::Strategies::Gust do
     end
   end
 
+  describe '#uid' do
+    before :each do
+      subject.stub(:raw_info) { { 'id' => '123' } }
+    end
+
+    it 'returns the id from raw_info' do
+      subject.uid.should eq('123')
+    end
+  end
+
   describe '#info' do
     before :each do
-      @raw_info = {
-        'name' => 'Sebastian Rabuini',
-        'bio' => 'Sebas',
-        'image' => 'foto',
-      }
-      subject.stub(:raw_ifno) { @raw_info }
+      @raw_info ||= { 'user_name' => 'sebas' }
+      subject.stub(:raw_info) { @raw_info }
     end
-    
+
     context 'when data is present in raw info' do
-      it 'returns the combined name' do
-        subject.info['name'].should eq('Sebastian Rabuini')
+
+      it 'returns the username as name' do
+        @raw_info['username'] = 'sebas'
+        subject.info['name'].should eq('sebas')
       end
 
-      it 'returns the bio' do
-        subject.info['bio'].should eq('Sebas')
-      end
-    
-      it 'returns the image' do
-        subject.info['image'].should eq('foto')
+      it 'returns email as email' do
+        @raw_info['email'] = 'sebas@foob.ar'
+        subject.info['email'].should eq('sebas@foob.ar')
       end
 
-      it "sets the email blank if contact block is missing in raw_info" do
-        @raw_info.delete('contact')
-        subject.info['email'].should be_nil
+      it 'returns company_name as company_name' do
+        @raw_info['company_name'] = 'wasabit'
+        subject.info['company_name'].should eq('wasabit')
       end
+
+      it 'returns the Gust profile page link as the Gust url' do
+        @raw_info['profile_url'] = 'https://alpha.gust.com/c/wasabit'
+        subject.info['urls'].should be_a(Hash)
+        subject.info['urls']['profile'].should eq('https://alpha.gust.com/c/wasabit')
+      end
+
     end
   end
-  
-  describe '#credentials' do
+
+  describe '#raw_info' do
     before :each do
       @access_token = double('OAuth2::AccessToken')
-      @access_token.stub(:token)
-      @access_token.stub(:expires?)
-      @access_token.stub(:expires_at)
-      @access_token.stub(:refresh_token)
       subject.stub(:access_token) { @access_token }
     end
-    
+
+    it 'performs a GET to https://alpha.gust.com/r/oauth/user_details' do
+      @access_token.stub(:get) { double('OAuth2::Response').as_null_object }
+      @access_token.should_receive('options')
+      @access_token.should_receive(:get).with('/r/oauth/user_details')
+      subject.raw_info
+    end
+
     it 'returns a Hash' do
-      subject.credentials.should be_a(Hash)
-    end
-    
-    it 'returns the token' do
-      @access_token.stub(:token) { '123' }
-      subject.credentials['token'].should eq('123')
-    end
-    
-    it 'returns the expiry status' do
-      @access_token.stub(:expires?) { true }
-      subject.credentials['expires'].should eq(true)
-      
-      @access_token.stub(:expires?) { false }
-      subject.credentials['expires'].should eq(false)
-    end
-    
-    it 'returns the refresh token and expiry time when expiring' do
-      ten_mins_from_now = (Time.now + 360).to_i
-      @access_token.stub(:expires?) { true }
-      @access_token.stub(:refresh_token) { '321' }
-      @access_token.stub(:expires_at) { ten_mins_from_now }
-      subject.credentials['refresh_token'].should eq('321')
-      subject.credentials['expires_at'].should eq(ten_mins_from_now)
-    end
-    
-    it 'does not return the refresh token when it is nil and expiring' do
-      @access_token.stub(:expires?) { true }
-      @access_token.stub(:refresh_token) { nil }
-      subject.credentials['refresh_token'].should be_nil
-      subject.credentials.should_not have_key('refresh_token')
-    end
-    
-    it 'does not return the refresh token when not expiring' do
-      @access_token.stub(:expires?) { false }
-      @access_token.stub(:refresh_token) { 'XXX' }
-      subject.credentials['refresh_token'].should be_nil
-      subject.credentials.should_not have_key('refresh_token')
+      @access_token.should_receive(:options)
+      @access_token.stub(:get).with('/r/oauth/user_details') do
+        raw_response = double('Faraday::Response')
+        raw_response.stub(:body) { '{ "foo": "bar" }' }
+        raw_response.stub(:status) { 200 }
+        raw_response.stub(:headers) { { 'Content-Type' => 'application/json' } }
+        OAuth2::Response.new(raw_response)
+      end
+      subject.raw_info.should be_a(Hash)
+      subject.raw_info['foo'].should eq('bar')
     end
   end
+
 end
