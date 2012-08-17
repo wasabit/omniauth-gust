@@ -8,7 +8,7 @@ module OmniAuth
       option :name, "gust"
 
       option :client_options, {
-        :site => 'https://alpha.gust.com',
+        :site => 'https://gust.com',
         :authorize_url => '/r/oauth/authorize',
         :token_url => '/r/oauth/token'
       }
