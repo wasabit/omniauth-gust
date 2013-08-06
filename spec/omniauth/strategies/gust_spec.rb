@@ -23,7 +23,7 @@ describe OmniAuth::Strategies::Gust do
 
   describe '#client' do
     it 'has correct Gust site' do
-      subject.client.site.should eq('https://alpha.gust.com')
+      subject.client.site.should eq('https://gust.com')
     end
 
     it 'has correct authorize url' do
@@ -69,9 +69,9 @@ describe OmniAuth::Strategies::Gust do
       end
 
       it 'returns the Gust profile page link as the Gust url' do
-        @raw_info['profile_url'] = 'https://alpha.gust.com/c/wasabit'
+        @raw_info['profile_url'] = 'https://gust.com/c/wasabit'
         subject.info['urls'].should be_a(Hash)
-        subject.info['urls']['profile'].should eq('https://alpha.gust.com/c/wasabit')
+        subject.info['urls']['profile'].should eq('https://gust.com/c/wasabit')
       end
 
     end
@@ -83,7 +83,7 @@ describe OmniAuth::Strategies::Gust do
       subject.stub(:access_token) { @access_token }
     end
 
-    it 'performs a GET to https://alpha.gust.com/r/oauth/user_details' do
+    it 'performs a GET to https://gust.com/r/oauth/user_details' do
       @access_token.stub(:get) { double('OAuth2::Response').as_null_object }
       @access_token.should_receive('options')
       @access_token.should_receive(:get).with('/r/oauth/user_details')

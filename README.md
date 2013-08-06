@@ -2,8 +2,6 @@
 
 This gem contains the Gust strategy for OmniAuth.
 
-Gust uses the OAuth2 flow, you can read about it here: http://angel.co/api/oauth/faq
-
 ## How To Use It
 
 So let's say you're using Rails, you need to add the strategy to your `Gemfile`:
